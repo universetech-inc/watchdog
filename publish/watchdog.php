@@ -1,0 +1,22 @@
+<?php
+
+declare(strict_types=1);
+
+use LaravelHyperf\Foundation\Application;
+
+use function LaravelHyperf\Support\env;
+
+return [
+    'server_pid_file' => env('WATCHDOG_SERVER_PID_FILE', BASE_PATH . '/runtime/watchdog.pid'),
+
+    'server_ports' => [
+        'main' => env('WATCHDOG_MAIN_SERVER_PORT', 9501),
+        'backup' => env('WATCHDOG_BACKUP_SERVER_PORT', 9502),
+    ],
+
+    'command' => [
+        'start' => 'start',
+        'php' => Application::phpBinary(),
+        'artisan' => Application::artisanBinary(),
+    ],
+];

@@ -1,0 +1,34 @@
+{
+    "name": "universetech/watchdog",
+    "type": "library",
+    "description": "The watchdog package for Laravel Hyperf.",
+    "license": "MIT",
+    "keywords": [
+        "php",
+        "watchdog",
+        "laravel-hyperf"
+    ],
+    "autoload": {
+        "psr-4": {
+            "UniverseTech\\Watchdog\\": "src/"
+        }
+    },
+    "require": {
+        "php": "^8.2",
+        "laravel-hyperf/foundation": "^0.1",
+        "laravel-hyperf/coroutine": "^0.1",
+        "laravel-hyperf/support": "^0.1",
+        "symfony/console": "^5.4 || ^6.4 || ^7.0"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "hyperf": {
+            "config": "UniverseTech\\Watchdog\\ConfigProvider"
+        },
+        "branch-alias": {
+            "dev-main": "0.1-dev"
+        }
+    }
+}
