@@ -28,6 +28,8 @@ class WatchdogStartCommand extends Command
 
     protected bool $isTransferring = false;
 
+    protected string $pidFile;
+
     protected array $pids = [];
 
     public function __construct(
@@ -36,6 +38,8 @@ class WatchdogStartCommand extends Command
         protected Filesystem $filesystem
     ) {
         parent::__construct();
+
+        $this->pidFile = $this->config->get('watchdog.server_pid_file', BASE_PATH . '/runtime/watchdog.pid');
     }
 
     public function handle()
@@ -64,21 +68,16 @@ class WatchdogStartCommand extends Command
 
     protected function writePidFile(int $pid): void
     {
-        $this->filesystem->put(
-            $this->config->get('watchdog.server_pid_file'),
-            $pid
-        );
+        $this->filesystem->put($this->pidFile, $pid);
     }
 
     protected function removePidFile(): void
     {
-        if (! $this->filesystem->exists($this->config->get('watchdog.server_pid_file'))) {
+        if (! $this->filesystem->exists($this->pidFile)) {
             return;
         }
 
-        $this->filesystem->delete(
-            $this->config->get('watchdog.server_pid_file')
-        );
+        $this->filesystem->delete($this->pidFile);
     }
 
     protected function init(): void
@@ -99,12 +98,13 @@ class WatchdogStartCommand extends Command
         });
     }
 
-    protected function startServer(?int $port = null, int $timeout = 30): int
+    protected function startServer(?int $port = null, ?int $timeout = null): int
     {
-        $env = [];
-        if ($port) {
-            $env['HTTP_SERVER_PORT'] = $port;
-        }
+        $env = [
+            'FORCE_COLOR' => 'true',
+            'TERM' => 'xterm-256color',
+            'HTTP_SERVER_PORT' => $port ?: $this->config->get('watchdog.ports.main', 9501),
+        ];
 
         $process = null;
         $failed = false;
@@ -114,7 +114,7 @@ class WatchdogStartCommand extends Command
             try {
                 $process = Process::forever()
                     ->env($env)
-                    ->start("{$this->getArtisanCommand()} start");
+                    ->start($this->getServerStartCommand());
 
                 $process->wait(function ($type, $buffer) {
                     $this->output->write($buffer);
@@ -131,6 +131,7 @@ class WatchdogStartCommand extends Command
         });
 
         $start = time();
+        $timeout = $timeout ?: (int) $this->config->get('watchdog.timeout', 30);
         while (! $process || ! $process->running()) {
             if ($failed || (time() - $start) > $timeout) {
                 throw new RuntimeException('Failed to start server.');
@@ -150,7 +151,7 @@ class WatchdogStartCommand extends Command
         }
 
         $this->info('Starting new server...');
-        $this->pids['backup'] = $this->startServer(9502);
+        $this->pids['backup'] = $this->startServer((int) $this->config->get('watchdog.ports.backup', 9502));
 
         $this->info('Stopping original server...');
         $this->kill($this->pids['current']);
@@ -166,7 +167,7 @@ class WatchdogStartCommand extends Command
         $this->isTransferring = false;
     }
 
-    protected function kill(int $pid, int $timeout = 30): void
+    protected function kill(int $pid, ?int $timeout = null): void
     {
         if (! posix_kill($pid, 0)) {
             $this->warn("Process [{$pid}] doesn't exist.");
@@ -174,6 +175,7 @@ class WatchdogStartCommand extends Command
         }
 
         $start = time();
+        $timeout = $timeout ?: (int) $this->config->get('watchdog.timeout', 30);
         while ((time() - $start) < $timeout) {
             posix_kill($pid, SIGTERM);
             if (! posix_kill($pid, 0)) {
@@ -187,11 +189,12 @@ class WatchdogStartCommand extends Command
         throw new RuntimeException("Failed to kill process [{$pid}].");
     }
 
-    protected function getArtisanCommand(): string
+    protected function getServerStartCommand(): string
     {
         $php = $this->config->get('watchdog.command.php', Application::phpBinary());
         $artisan = $this->config->get('watchdog.command.artisan', Application::artisanBinary());
+        $command = $this->config->get('watchdog.command.start', 'start');
 
-        return "{$php} {$artisan}";
+        return "{$php} {$artisan} {$command}";
     }
 }

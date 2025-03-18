@@ -19,4 +19,6 @@ return [
         'php' => Application::phpBinary(),
         'artisan' => Application::artisanBinary(),
     ],
+
+    'timeout' => 30,
 ];
