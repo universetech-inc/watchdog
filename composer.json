@@ -1,5 +1,5 @@
 {
-    "name": "universetech/watchdog",
+    "name": "universetech-inc/watchdog",
     "type": "library",
     "description": "The watchdog package for Laravel Hyperf.",
     "license": "MIT",
