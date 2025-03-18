@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use LaravelHyperf\Foundation\Application;
+use LaravelHyperf\Foundation\Console\Application;
 
 use function LaravelHyperf\Support\env;
 
