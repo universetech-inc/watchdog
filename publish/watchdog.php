@@ -7,7 +7,7 @@ use LaravelHyperf\Foundation\Console\Application;
 use function LaravelHyperf\Support\env;
 
 return [
-    'server_pid_file' => env('WATCHDOG_SERVER_PID_FILE', BASE_PATH . '/runtime/watchdog.pid'),
+    'watchdog_pid_file' => env('WATCHDOG_SERVER_PID_FILE', BASE_PATH . '/runtime/watchdog.pid'),
 
     'server_ports' => [
         'main' => env('WATCHDOG_MAIN_SERVER_PORT', 9501),

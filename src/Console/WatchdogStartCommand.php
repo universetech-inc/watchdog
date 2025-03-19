@@ -28,7 +28,9 @@ class WatchdogStartCommand extends Command
 
     protected bool $isTransferring = false;
 
-    protected string $pidFile;
+    protected string $watchdogPidFile;
+
+    protected string $serverPidFile;
 
     protected array $pids = [];
 
@@ -39,7 +41,11 @@ class WatchdogStartCommand extends Command
     ) {
         parent::__construct();
 
-        $this->pidFile = $this->config->get('watchdog.server_pid_file', BASE_PATH . '/runtime/watchdog.pid');
+        $this->watchdogPidFile = $this->config->get('watchdog.watchdog_pid_file', BASE_PATH . '/runtime/watchdog.pid');
+        $this->serverPidFile = $this->config->get(
+            'watchdog.server_pid_file',
+            $this->config->get('server.setting.pid_file', BASE_PATH . '/runtime/laravel-hyperf.pid')
+        );
     }
 
     public function handle()
@@ -63,21 +69,7 @@ class WatchdogStartCommand extends Command
             }
         }
 
-        $this->removePidFile();
-    }
-
-    protected function writePidFile(int $pid): void
-    {
-        $this->filesystem->put($this->pidFile, $pid);
-    }
-
-    protected function removePidFile(): void
-    {
-        if (! $this->filesystem->exists($this->pidFile)) {
-            return;
-        }
-
-        $this->filesystem->delete($this->pidFile);
+        $this->removeWatchdogPidFile();
     }
 
     protected function init(): void
@@ -86,7 +78,7 @@ class WatchdogStartCommand extends Command
         $this->channel->push(true);
 
         $this->registerSignal();
-        $this->writePidFile(posix_getpid());
+        $this->writeWatchdogPidFile(posix_getpid());
     }
 
     protected function registerSignal(): void
@@ -107,11 +99,19 @@ class WatchdogStartCommand extends Command
             'HTTP_SERVER_PORT' => $port,
         ];
 
+        $this->clearServerPidFile();
+
         $process = null;
         $failed = false;
 
         Coroutine::create(function () use ($env, &$process, &$failed, $port) {
             $this->info("Starting server [{$port}]...");
+
+            if (! $this->waitPortAvailable($port, 20)) {
+                $failed = true;
+                $this->error("Port [{$port}] is not available.");
+                $this->channel->push(false);
+            }
 
             try {
                 $process = Process::forever()
@@ -134,14 +134,17 @@ class WatchdogStartCommand extends Command
 
         $start = time();
         $timeout = $timeout ?: (int) $this->config->get('watchdog.timeout', 30);
-        while (! $process || ! $process->running()) {
+        $pid = null;
+        while (! $process || ! $process->running() || ! $pid = $this->getServerPid()) {
             if ($failed || (time() - $start) > $timeout) {
                 throw new RuntimeException("Failed to start server. [{$port}]");
             }
             usleep(100000);
         }
 
-        return $process->id();
+        $this->info("Server pid: {$pid} started successfully. [{$port}]");
+
+        return $pid;
     }
 
     protected function restartServer(): void
@@ -178,17 +181,79 @@ class WatchdogStartCommand extends Command
 
         $start = time();
         $timeout = $timeout ?: (int) $this->config->get('watchdog.timeout', 30);
+        $hasWarned = false;
         while ((time() - $start) < $timeout) {
             posix_kill($pid, SIGTERM);
             if (! posix_kill($pid, 0)) {
+                $this->info("Process [{$pid}] is killed.");
                 return;
             }
-            $this->warn("Process [{$pid}] is still alive, retrying...");
+
+            if (! $hasWarned) {
+                $hasWarned = true;
+                $this->warn("Process [{$pid}] is still alive, waiting...");
+            }
 
             sleep(1);
         }
 
         throw new RuntimeException("Failed to kill process [{$pid}].");
+    }
+
+    protected function waitPortAvailable(int $port, ?int $timeout = null): bool
+    {
+        $start = time();
+        $timeout = $timeout ?: (int) $this->config->get('watchdog.timeout', 30);
+        $hasWarned = false;
+        while ((time() - $start) < $timeout) {
+            $connection = @fsockopen('127.0.0.1', $port, $errno, $errstr, 1);
+            if (is_resource($connection)) {
+                fclose($connection);
+                if (! $hasWarned) {
+                    $hasWarned = true;
+                    $this->warn("Port [{$port}] is still in use, waiting...");
+                }
+                sleep(1);
+                continue;
+            }
+
+            $this->info("Port [{$port}] is available.");
+            return true;
+        }
+
+        return false;
+    }
+
+    protected function writeWatchdogPidFile(int $pid): void
+    {
+        $this->filesystem->put($this->watchdogPidFile, $pid);
+    }
+
+    protected function removeWatchdogPidFile(): void
+    {
+        if (! $this->filesystem->exists($this->watchdogPidFile)) {
+            return;
+        }
+
+        $this->filesystem->delete($this->watchdogPidFile);
+    }
+
+    protected function getServerPid(): ?int
+    {
+        if (! $this->filesystem->exists($this->serverPidFile)) {
+            return null;
+        }
+
+        return (int) $this->filesystem->get($this->serverPidFile);
+    }
+
+    protected function clearServerPidFile(): void
+    {
+        if (! $this->filesystem->exists($this->serverPidFile)) {
+            return;
+        }
+
+        $this->filesystem->delete($this->serverPidFile);
     }
 
     protected function getServerStartCommand(): string
