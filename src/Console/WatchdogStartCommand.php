@@ -100,16 +100,18 @@ class WatchdogStartCommand extends Command
 
     protected function startServer(?int $port = null, ?int $timeout = null): int
     {
+        $port = $port ?: (int) $this->config->get('watchdog.ports.main', 9501);
         $env = [
             'FORCE_COLOR' => 'true',
             'TERM' => 'xterm-256color',
-            'HTTP_SERVER_PORT' => $port ?: $this->config->get('watchdog.ports.main', 9501),
+            'HTTP_SERVER_PORT' => $port,
         ];
 
         $process = null;
         $failed = false;
-        Coroutine::create(function () use ($env, &$process, &$failed) {
-            $this->info('Starting server...');
+
+        Coroutine::create(function () use ($env, &$process, &$failed, $port) {
+            $this->info("Starting server [{$port}]...");
 
             try {
                 $process = Process::forever()
@@ -126,7 +128,7 @@ class WatchdogStartCommand extends Command
             if (! $this->isTransferring) {
                 $failed = true;
                 $this->channel->push(false);
-                $this->error('Server stopped.');
+                $this->error("Server stopped. [{$port}]");
             }
         });
 
@@ -134,7 +136,7 @@ class WatchdogStartCommand extends Command
         $timeout = $timeout ?: (int) $this->config->get('watchdog.timeout', 30);
         while (! $process || ! $process->running()) {
             if ($failed || (time() - $start) > $timeout) {
-                throw new RuntimeException('Failed to start server.');
+                throw new RuntimeException("Failed to start server. [{$port}]");
             }
             usleep(100000);
         }
@@ -147,19 +149,19 @@ class WatchdogStartCommand extends Command
         $this->info('Restarting server...');
 
         if (! $this->pids['current'] ?? null) {
-            throw new RuntimeException('Current server pid is not found.');
+            throw new RuntimeException("Current server pid: {$this->pids['current']} is not found.");
         }
 
         $this->info('Starting new server...');
         $this->pids['backup'] = $this->startServer((int) $this->config->get('watchdog.ports.backup', 9502));
 
-        $this->info('Stopping original server...');
+        $this->info("Stopping original server (pid: [{$this->pids['current']}])...");
         $this->kill($this->pids['current']);
 
         $this->info('Transferring server port...');
         $this->pids['current'] = $this->startServer();
 
-        $this->info('Stopping backup server...');
+        $this->info("Stopping backup server (pid: [{$this->pids['backup']}])...");
         $this->kill($this->pids['backup']);
 
         $this->info('Server restarted successfully.');
