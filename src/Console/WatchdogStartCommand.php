@@ -44,7 +44,7 @@ class WatchdogStartCommand extends Command
         $this->watchdogPidFile = $this->config->get('watchdog.watchdog_pid_file', BASE_PATH . '/runtime/watchdog.pid');
         $this->serverPidFile = $this->config->get(
             'watchdog.server_pid_file',
-            $this->config->get('server.setting.pid_file', BASE_PATH . '/runtime/laravel-hyperf.pid')
+            $this->config->get('server.setting.pid_file', BASE_PATH . '/runtime/hypervel.pid')
         );
     }
 
