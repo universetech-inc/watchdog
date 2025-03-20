@@ -6,11 +6,11 @@ namespace UniverseTech\Watchdog\Console;
 
 use Hyperf\Contract\ConfigInterface;
 use Hyperf\Support\Filesystem\Filesystem;
-use LaravelHyperf\Coroutine\Channel;
-use LaravelHyperf\Coroutine\Coroutine;
-use LaravelHyperf\Foundation\Console\Application;
-use LaravelHyperf\Foundation\Console\Command;
-use LaravelHyperf\Support\Facades\Process;
+use Hypervel\Coroutine\Channel;
+use Hypervel\Coroutine\Coroutine;
+use Hypervel\Foundation\Console\Application;
+use Hypervel\Foundation\Console\Command;
+use Hypervel\Support\Facades\Process;
 use Psr\Container\ContainerInterface;
 use RuntimeException;
 use Symfony\Component\Process\Exception\ProcessSignaledException;

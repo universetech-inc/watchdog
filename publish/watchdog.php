@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use LaravelHyperf\Foundation\Console\Application;
+use Hypervel\Foundation\Console\Application;
 
-use function LaravelHyperf\Support\env;
+use function Hypervel\Support\env;
 
 return [
     'watchdog_pid_file' => env('WATCHDOG_SERVER_PID_FILE', BASE_PATH . '/runtime/watchdog.pid'),

@@ -6,7 +6,7 @@ namespace UniverseTech\Watchdog\Console;
 
 use Hyperf\Contract\ConfigInterface;
 use Hyperf\Support\Filesystem\Filesystem;
-use LaravelHyperf\Foundation\Console\Command;
+use Hypervel\Foundation\Console\Command;
 
 class WatchdogUpdateCommand extends Command
 {
