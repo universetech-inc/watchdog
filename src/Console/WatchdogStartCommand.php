@@ -6,10 +6,10 @@ namespace UniverseTech\Watchdog\Console;
 
 use Hyperf\Contract\ConfigInterface;
 use Hyperf\Support\Filesystem\Filesystem;
+use Hypervel\Console\Command;
 use Hypervel\Coroutine\Channel;
 use Hypervel\Coroutine\Coroutine;
 use Hypervel\Foundation\Console\Application;
-use Hypervel\Foundation\Console\Command;
 use Hypervel\Support\Facades\Process;
 use Psr\Container\ContainerInterface;
 use RuntimeException;
