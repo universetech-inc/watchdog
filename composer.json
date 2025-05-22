@@ -15,9 +15,9 @@
     },
     "require": {
         "php": "^8.2",
-        "hypervel/foundation": "^0.1",
-        "hypervel/coroutine": "^0.1",
-        "hypervel/support": "^0.1",
+        "hypervel/foundation": "^0.1 || ^0.2",
+        "hypervel/coroutine": "^0.1 || ^0.2",
+        "hypervel/support": "^0.1 || ^0.2",
         "symfony/console": "^5.4 || ^6.4 || ^7.0"
     },
     "config": {
