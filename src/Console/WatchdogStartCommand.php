@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace UniverseTech\Watchdog\Console;
 
+use Dotenv\Dotenv;
 use Hyperf\Contract\ConfigInterface;
 use Hyperf\Support\Filesystem\Filesystem;
 use Hypervel\Console\Application;
@@ -98,6 +99,13 @@ class WatchdogStartCommand extends Command
             'TERM' => 'xterm-256color',
             'HTTP_SERVER_PORT' => $port,
         ];
+
+        if ($this->config->get('watchdog.env_overload', true)) {
+            $env = array_merge(
+                array_fill_keys(array_keys($this->loadDotEnv()), false),
+                $env
+            );
+        }
 
         $this->clearServerPidFile();
 
@@ -263,5 +271,11 @@ class WatchdogStartCommand extends Command
         $command = $this->config->get('watchdog.command.start', 'start');
 
         return "{$php} {$artisan} {$command}";
+    }
+
+    protected function loadDotEnv(): array
+    {
+        return Dotenv::createMutable($this->container->basePath())
+            ->load();
     }
 }

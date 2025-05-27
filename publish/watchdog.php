@@ -21,4 +21,6 @@ return [
     ],
 
     'timeout' => 30,
+
+    'env_overload' => true,
 ];
