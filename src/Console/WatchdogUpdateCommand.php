@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace UniverseTech\Watchdog\Console;
 
-use Hyperf\Contract\ConfigInterface;
-use Hyperf\Support\Filesystem\Filesystem;
 use Hypervel\Console\Command;
+use Hypervel\Contracts\Config\Repository;
+use Hypervel\Contracts\Foundation\Application as ApplicationContract;
+use Hypervel\Filesystem\Filesystem;
+use Symfony\Component\Console\Attribute\AsCommand;
 
+#[AsCommand(name: 'watchdog:update')]
 class WatchdogUpdateCommand extends Command
 {
     protected ?string $signature = 'watchdog:update';
@@ -15,7 +18,8 @@ class WatchdogUpdateCommand extends Command
     protected string $description = 'Broadcast update signal to watchdog process.';
 
     public function __construct(
-        protected ConfigInterface $config,
+        protected ApplicationContract $app,
+        protected Repository $config,
         protected Filesystem $filesystem
     ) {
         parent::__construct();
@@ -23,13 +27,13 @@ class WatchdogUpdateCommand extends Command
 
     public function handle()
     {
-        $pidFile = $this->config->get('watchdog.server_pid_file' , BASE_PATH . '/runtime/watchdog.pid');
+        $pidFile = $this->config->get('watchdog.watchdog_pid_file', $this->app->storagePath('framework/watchdog.pid'));
         if (! $this->filesystem->isFile($pidFile)) {
             $this->error('Watchdog process is not running.');
             return;
         }
 
-        if (! $pid = (int) file_get_contents($pidFile)) {
+        if (! $pid = (int) $this->filesystem->get($pidFile)) {
             $this->error('Pid file is invalid.');
             return;
         }

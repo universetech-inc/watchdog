@@ -2,12 +2,10 @@
 
 declare(strict_types=1);
 
-use Hypervel\Foundation\Console\Application;
-
-use function Hypervel\Support\env;
+use Hypervel\Console\Application;
 
 return [
-    'watchdog_pid_file' => env('WATCHDOG_SERVER_PID_FILE', BASE_PATH . '/runtime/watchdog.pid'),
+    'watchdog_pid_file' => env('WATCHDOG_SERVER_PID_FILE', storage_path('framework/watchdog.pid')),
 
     'server_ports' => [
         'main' => env('WATCHDOG_MAIN_SERVER_PORT', 9501),
@@ -15,7 +13,7 @@ return [
     ],
 
     'command' => [
-        'start' => 'start',
+        'start' => 'serve',
         'php' => Application::phpBinary(),
         'artisan' => Application::artisanBinary(),
     ],

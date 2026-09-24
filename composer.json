@@ -14,21 +14,33 @@
         }
     },
     "require": {
-        "php": "^8.2",
-        "hypervel/foundation": "^0.1 || ^0.2 || ^0.3",
-        "hypervel/coroutine": "^0.1 || ^0.2 || ^0.3",
-        "hypervel/support": "^0.1 || ^0.2 || ^0.3",
-        "symfony/console": "^5.4 || ^6.4 || ^7.0"
+        "php": "^8.4",
+        "ext-pcntl": "*",
+        "ext-posix": "*",
+        "ext-swoole": "^6.2",
+        "hypervel/console": "^0.4",
+        "hypervel/contracts": "^0.4",
+        "hypervel/coroutine": "^0.4",
+        "hypervel/engine": "^0.4",
+        "hypervel/filesystem": "^0.4",
+        "hypervel/foundation": "^0.4",
+        "hypervel/process": "^0.4",
+        "hypervel/support": "^0.4",
+        "symfony/console": "^8.1",
+        "symfony/process": "^8.1",
+        "vlucas/phpdotenv": "^5.6.1"
     },
     "config": {
         "sort-packages": true
     },
     "extra": {
-        "hyperf": {
-            "config": "UniverseTech\\Watchdog\\ConfigProvider"
-        },
         "branch-alias": {
-            "dev-main": "0.1-dev"
+            "dev-0.4": "0.4-dev"
+        },
+        "hypervel": {
+            "providers": [
+                "UniverseTech\\Watchdog\\WatchdogServiceProvider"
+            ]
         }
     }
 }

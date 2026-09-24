@@ -5,18 +5,21 @@ declare(strict_types=1);
 namespace UniverseTech\Watchdog\Console;
 
 use Dotenv\Dotenv;
-use Hyperf\Contract\ConfigInterface;
-use Hyperf\Support\Filesystem\Filesystem;
 use Hypervel\Console\Application;
 use Hypervel\Console\Command;
-use Hypervel\Coroutine\Channel;
+use Hypervel\Contracts\Config\Repository;
+use Hypervel\Contracts\Foundation\Application as ApplicationContract;
 use Hypervel\Coroutine\Coroutine;
+use Hypervel\Engine\Channel;
+use Hypervel\Engine\Signal;
+use Hypervel\Filesystem\Filesystem;
 use Hypervel\Support\Facades\Process;
-use Psr\Container\ContainerInterface;
 use RuntimeException;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Process\Exception\ProcessSignaledException;
 use Throwable;
 
+#[AsCommand(name: 'watchdog:start')]
 class WatchdogStartCommand extends Command
 {
     protected ?string $signature = 'watchdog:start';
@@ -29,6 +32,8 @@ class WatchdogStartCommand extends Command
 
     protected bool $isTransferring = false;
 
+    protected bool $running = false;
+
     protected string $watchdogPidFile;
 
     protected string $serverPidFile;
@@ -36,16 +41,16 @@ class WatchdogStartCommand extends Command
     protected array $pids = [];
 
     public function __construct(
-        protected ContainerInterface $container,
-        protected ConfigInterface $config,
+        protected ApplicationContract $app,
+        protected Repository $config,
         protected Filesystem $filesystem
     ) {
         parent::__construct();
 
-        $this->watchdogPidFile = $this->config->get('watchdog.watchdog_pid_file', BASE_PATH . '/runtime/watchdog.pid');
+        $this->watchdogPidFile = $this->config->get('watchdog.watchdog_pid_file', $this->app->storagePath('framework/watchdog.pid'));
         $this->serverPidFile = $this->config->get(
             'watchdog.server_pid_file',
-            $this->config->get('server.setting.pid_file', BASE_PATH . '/runtime/hypervel.pid')
+            $this->config->get('server.settings.pid_file', $this->app->storagePath('framework/hypervel.pid'))
         );
     }
 
@@ -70,6 +75,7 @@ class WatchdogStartCommand extends Command
             }
         }
 
+        $this->running = false;
         $this->removeWatchdogPidFile();
     }
 
@@ -77,6 +83,7 @@ class WatchdogStartCommand extends Command
     {
         $this->channel = new Channel(1);
         $this->channel->push(true);
+        $this->running = true;
 
         $this->registerSignal();
         $this->writeWatchdogPidFile(posix_getpid());
@@ -84,20 +91,27 @@ class WatchdogStartCommand extends Command
 
     protected function registerSignal(): void
     {
-        pcntl_signal(SIGWINCH, function () {
-            $this->needRestart = true;
-            $this->isTransferring = true;
-            $this->channel->push(true);
+        // Wait with a timeout so the loop can observe `running` and let the process exit.
+        Coroutine::create(function () {
+            while ($this->running) {
+                if (! Signal::wait(SIGWINCH, 1)) {
+                    continue;
+                }
+
+                $this->needRestart = true;
+                $this->isTransferring = true;
+                $this->channel->push(true);
+            }
         });
     }
 
     protected function startServer(?int $port = null, ?int $timeout = null): int
     {
-        $port = $port ?: (int) $this->config->get('watchdog.ports.main', 9501);
+        $port = $port ?: (int) $this->config->get('watchdog.server_ports.main', 9501);
         $env = [
             'FORCE_COLOR' => 'true',
             'TERM' => 'xterm-256color',
-            'HTTP_SERVER_PORT' => $port,
+            'HTTP_SERVER_PORT' => (string) $port,
         ];
 
         if ($this->config->get('watchdog.env_overload', true)) {
@@ -159,12 +173,12 @@ class WatchdogStartCommand extends Command
     {
         $this->info('Restarting server...');
 
-        if (! $this->pids['current'] ?? null) {
-            throw new RuntimeException("Current server pid: {$this->pids['current']} is not found.");
+        if (! ($this->pids['current'] ?? null)) {
+            throw new RuntimeException('Current server pid is not found.');
         }
 
         $this->info('Starting new server...');
-        $this->pids['backup'] = $this->startServer((int) $this->config->get('watchdog.ports.backup', 9502));
+        $this->pids['backup'] = $this->startServer((int) $this->config->get('watchdog.server_ports.backup', 9502));
 
         $this->info("Stopping original server (pid: [{$this->pids['current']}])...");
         $this->kill($this->pids['current']);
@@ -234,7 +248,7 @@ class WatchdogStartCommand extends Command
 
     protected function writeWatchdogPidFile(int $pid): void
     {
-        $this->filesystem->put($this->watchdogPidFile, $pid);
+        $this->filesystem->put($this->watchdogPidFile, (string) $pid);
     }
 
     protected function removeWatchdogPidFile(): void
@@ -273,9 +287,17 @@ class WatchdogStartCommand extends Command
         return "{$php} {$artisan} {$command}";
     }
 
+    /**
+     * Read the keys of the current env file without touching this process's environment.
+     *
+     * The env repository in Hypervel 0.4 is immutable, so values inherited from this
+     * process would otherwise take precedence over the updated env file in the child.
+     */
     protected function loadDotEnv(): array
     {
-        return Dotenv::createMutable($this->container->basePath())
-            ->load();
+        $environmentFile = $this->app->environmentFilePath();
+
+        return Dotenv::createArrayBacked(dirname($environmentFile), basename($environmentFile))
+            ->safeLoad();
     }
 }
