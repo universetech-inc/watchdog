@@ -35,14 +35,14 @@ php artisan vendor:publish --tag=watchdog-config
 
 ### Application requirements
 
-The watchdog tells each child server which port to use through the `HTTP_SERVER_PORT` environment
-variable. Your `config/server.php` must read it:
+The watchdog starts each server with `php artisan serve --port={port}`. `serve` applies the option to
+the first HTTP server in `config/server.php`, whichever env variable that entry reads.
 
-```php
-'port' => (int) env('HTTP_SERVER_PORT', 9501),
-```
+Each server also gets the port in the `HTTP_SERVER_PORT` environment variable, for apps that read the
+port from there.
 
-If it does not, the backup server tries to bind the main port and the restart times out.
+Every other port the app binds, such as a WebSocket server, must be free for a second server
+instance. Otherwise the backup server fails to start and every restart is aborted.
 
 Both servers write the same pid file (`server.settings.pid_file`). The watchdog clears it before
 each start and restores it when a restart finishes.
@@ -54,15 +54,21 @@ With nginx:
 
 ```nginx
 upstream hypervel {
-    server 127.0.0.1:9501 max_fails=1 fail_timeout=1s;
-    server 127.0.0.1:9502 backup;
+    server 127.0.0.1:9501 max_fails=0;
+    server 127.0.0.1:9502 max_fails=0 backup;
 }
 ```
 
-nginx only retries a request on the next upstream if nothing was sent to the first one. A refused
-connection meets that condition, so requests arriving between steps 2 and 3 go to the backup server.
-Requests already in flight on the original server finish during Swoole's graceful shutdown, which is
-bounded by the server's `max_wait_time` setting.
+`max_fails=0` keeps nginx from marking a server as unavailable. Every request tries the main port
+first and falls back to the backup port only if that attempt fails. With `max_fails=1`, a restart marks
+the main port as failed when the original server stops, then the backup port when the backup server
+stops. The new server is already running at that point, but nginx has no live upstream until
+`fail_timeout` expires and answers `502` in the meantime.
+
+A refused connection is always retried on the backup port, so requests arriving between steps 2 and 3
+are served. Requests in flight on a server that is stopping are cut off. nginx retries them only if they
+are idempotent (`GET`, `HEAD`, ...). Non-idempotent requests such as `POST` fail with `502` unless
+`proxy_next_upstream non_idempotent` is set, which can process a request twice.
 
 ## Usage
 
@@ -116,7 +122,7 @@ An aborted restart is reported in the watchdog's output.
 | `server_pid_file` | | `null` | Pid file written by the servers. `null` uses `server.settings.pid_file`. |
 | `server_ports.main` | `WATCHDOG_MAIN_SERVER_PORT` | `9501` | Port that serves traffic. |
 | `server_ports.backup` | `WATCHDOG_BACKUP_SERVER_PORT` | `9502` | Port used only during a restart. |
-| `command.*` | | `php artisan serve` | Run as `exec {php} {artisan} {start}` through the shell. It must be a single command, and custom values must be shell-escaped, as the defaults are. |
+| `command.*` | | `php artisan serve` | Run as `exec {php} {artisan} {start} --port={port}` through the shell. It must be a single command that accepts `--port`, and custom values must be shell-escaped, as the defaults are. |
 | `reload_signal` | `WATCHDOG_RELOAD_SIGNAL` | `SIGUSR2` | Signal number that triggers a restart. |
 | `port_timeout` | `WATCHDOG_PORT_TIMEOUT` | `20` | Seconds to wait for a port to become free before starting a server on it. |
 | `timeout` | `WATCHDOG_TIMEOUT` | `30` | Seconds for a spawned server to write its pid file, and for a server to exit after `SIGTERM` before it is sent `SIGKILL`. |
@@ -143,6 +149,9 @@ of running `watchdog:update`**. The running watchdog still has the old code:
 - **It does not handle `SIGUSR2`.** The reload signal changed from `SIGWINCH`, which terminals also
   send on every window resize and so triggered unintended restarts. `SIGUSR2` would terminate the old
   watchdog and leave its server running with no supervisor. The lock check above prevents this.
+
+The start command now gets `--port={port}` appended. If you set `command.start` to a custom command,
+make sure it accepts that option.
 
 `WATCHDOG_SERVER_PID_FILE` is deprecated in favour of `WATCHDOG_PID_FILE`. A published
 `config/watchdog.php` keeps working, but republish it to pick up the new keys and comments.

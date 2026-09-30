@@ -305,7 +305,7 @@ class WatchdogStartCommand extends Command
 
             $server->process = Process::forever()
                 ->env($env)
-                ->start($this->getServerStartCommand());
+                ->start($this->getServerStartCommand($server->port));
 
             // The watchdog may have given up on this server while it was being spawned.
             if ($server->stopping && $server->process->running()) {
@@ -538,14 +538,17 @@ class WatchdogStartCommand extends Command
     /**
      * `exec` replaces the intermediate shell, so the spawned process is the server itself
      * and signals sent to it reach the server.
+     *
+     * `--port` overrides the port of the first HTTP server whatever env variable the app's
+     * `config/server.php` reads (`SERVER_PORT` in the Hypervel 0.4 skeleton).
      */
-    protected function getServerStartCommand(): string
+    protected function getServerStartCommand(int $port): string
     {
         $php = $this->config->get('watchdog.command.php', Application::phpBinary());
         $artisan = $this->config->get('watchdog.command.artisan', Application::artisanBinary());
         $command = $this->config->get('watchdog.command.start', 'serve');
 
-        return "exec {$php} {$artisan} {$command}";
+        return "exec {$php} {$artisan} {$command} --port={$port}";
     }
 
     /**
