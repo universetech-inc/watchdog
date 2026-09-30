@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace UniverseTech\Watchdog;
+namespace UniverseTech\Watchdog\Process;
 
 use Hypervel\Contracts\Process\InvokedProcess;
 
@@ -37,8 +37,13 @@ final class ServerProcess
      */
     public bool $exited = false;
 
+    /**
+     * @param bool $sharesPort Whether the server binds the port alongside a running server
+     *                         (reuse port strategy), so it must not wait for the port to be free.
+     */
     public function __construct(
-        public readonly int $port
+        public readonly int $port,
+        public readonly bool $sharesPort = false
     ) {
     }
 }

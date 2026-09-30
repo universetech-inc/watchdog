@@ -12,6 +12,13 @@ return [
     // Pid file written by the servers. Null uses `server.settings.pid_file`.
     'server_pid_file' => null,
 
+    // How a restart keeps the port open:
+    // - backup_port: serve from `server_ports.backup` while the main port is handed over.
+    //   The proxy must fall back to the backup port.
+    // - reuse_port: start the new server on the main port with SO_REUSEPORT, then stop the old
+    //   one. Linux only; no WebSocket servers. See README.
+    'strategy' => env('WATCHDOG_STRATEGY', 'backup_port'),
+
     'server_ports' => [
         'main' => env('WATCHDOG_MAIN_SERVER_PORT', 9501),
         'backup' => env('WATCHDOG_BACKUP_SERVER_PORT', 9502),

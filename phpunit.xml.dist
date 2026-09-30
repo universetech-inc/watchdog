@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         cacheDirectory=".phpunit.cache"
+         colors="true"
+         defaultTimeLimit="60"
+         timeoutForLargeTests="120"
+         enforceTimeLimit="true"
+         failOnRisky="true"
+         failOnWarning="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+    <extensions>
+        <bootstrap class="Hypervel\Testing\PHPUnit\AfterEachTestExtension" />
+    </extensions>
+    <php>
+        <server name="HYPERVEL_PARALLEL_TESTING" value="1"/>
+        <env name="APP_ENV" value="testing"/>
+        <env name="OTEL_SDK_DISABLED" value="true"/>
+        <!-- Keep Symfony Console from shelling out to `stty` from hooked coroutine tests. -->
+        <env name="COLUMNS" value="80" force="true"/>
+        <env name="LINES" value="24" force="true"/>
+    </php>
+</phpunit>
